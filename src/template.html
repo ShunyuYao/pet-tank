@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>桌宠坦克营</title>
+  <script type="application/json" id="pet-sdk">{"version":2,"permissions":["character:read","character:watch","sessions:connect"],"network":["lan"],"interaction":{"players":4,"transport":"lan","protocol":{"id":"pet-tank","version":1}}}</script>
+  <style>__STYLE__</style>
+</head>
+<body>
+  <canvas id="stage" aria-label="对战场地"></canvas>
+
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span><strong>桌宠坦克营</strong><span id="conn" class="conn" role="status" hidden></span></div>
+    <div class="tools">
+      <button id="keys-btn" class="pill" type="button" aria-expanded="false">键位</button>
+      <button id="sfx" class="pill" type="button" aria-pressed="true">音效 开</button>
+      <button id="leave" class="pill ghost" type="button" hidden>离开</button>
+    </div>
+  </header>
+  <div id="error" class="error" role="alert" hidden></div>
+
+  <section id="hud" class="hud" hidden aria-label="对局信息">
+    <div class="scorebox">
+      <span id="stage-no"></span>
+      <span id="enemies" class="enemies" aria-label="剩余敌车"></span>
+      <small id="left"></small>
+      <span id="versus-score" hidden></span>
+      <span id="timer" class="timer" hidden>3:00</span>
+      <span id="jar" class="jar" data-state="safe">零食罐安全</span>
+    </div>
+    <div id="bar" class="bar"></div>
+  </section>
+  <div id="announce" class="announce" hidden aria-live="assertive"></div>
+  <div id="hint" class="hint" hidden></div>
+
+  <div id="menu" class="menu">
+    <section id="title-panel" class="panel" aria-labelledby="title-h">
+      <div class="eyebrow">TOY TANK CAMP</div>
+      <h1 id="title-h">开着玩具坦克，守住零食罐</h1>
+      <p class="lede">电脑敌车一波波从上方开来，打碎积木墙冲向零食罐。打掉闪光的敌车会掉道具，捡星星给坦克升级，3 颗星能打穿铁饼干盒。</p>
+      <div class="fighter-card">
+        <div id="fighter-portrait" class="portrait" aria-hidden="true">🐭</div>
+        <div class="fighter-info"><small>坐进炮塔的形象</small><strong id="fighter-name">…</strong><span id="fighter-kind" class="kind-tag"></span></div>
+      </div>
+      <div id="grant-box" class="grant-box" hidden><p id="grant-text"></p><button id="grant-retry" class="chip" type="button">重新请求授权</button></div>
+      <p id="pet-auto" class="pet-auto" hidden></p>
+      <div class="field-label">模式</div>
+      <div id="mode-list" class="modes" role="radiogroup" aria-label="模式">
+        <button class="mode-card" type="button" role="radio" aria-checked="true" data-mode="coop"><strong>合作守家</strong><small>1–4 人一起打电脑，一关 20 辆</small></button>
+        <button class="mode-card" type="button" role="radio" aria-checked="false" data-mode="versus"><strong>组队对战</strong><small>2v2，先打翻对面的零食罐</small></button>
+      </div>
+      <details id="swap" class="import">
+        <summary>换个形象（可选）</summary>
+        <div class="import-row">
+          <button id="use-pet" class="chip" type="button" hidden>用当前桌宠</button>
+          <label class="chip file">导入角色包 / 图片<input id="import-file" type="file" accept=".zip,image/png,image/webp,image/jpeg,image/gif"></label>
+          <label class="chip file">导入角色文件夹<input id="import-folder" type="file" webkitdirectory></label>
+        </div>
+        <div id="toy-row" class="import-row toys"><small>内置形象：</small></div>
+      </details>
+      <p id="import-status" class="import-status" role="status"></p>
+      <div class="opts">
+        <div id="stage-opt"><div class="field-label">从第几关开始</div><div id="stage-list" class="chips"></div></div>
+        <div id="arena-opt" hidden><div class="field-label">对战地图</div><div id="arena-list" class="chips"></div></div>
+        <div><div class="field-label">电脑难度</div><div id="cpu-list" class="chips"></div></div>
+      </div>
+      <button id="solo" class="primary" type="button">单人开始 · 第 1 关</button>
+      <p id="env-note" class="note"></p>
+    </section>
+
+    <section id="lobby-panel" class="panel" hidden aria-labelledby="lobby-title">
+      <div class="eyebrow">LOBBY</div>
+      <h2 id="lobby-title">联机大厅</h2>
+      <div id="seats" class="seats"></div>
+      <div class="lobby-opts">
+        <div><div class="field-label">模式 <small id="host-hint"></small></div><div id="lobby-mode" class="chips"></div></div>
+        <div id="lobby-stage-opt"><div class="field-label">从第几关开始</div><div id="lobby-stage" class="chips"></div></div>
+        <div id="lobby-arena-opt" hidden><div class="field-label">对战地图</div><div id="lobby-arena" class="chips"></div></div>
+        <div><div class="field-label">电脑难度</div><div id="lobby-cpu" class="chips"></div></div>
+      </div>
+      <button id="ready" class="primary" type="button">我准备好了</button>
+      <p id="lobby-note" class="note"></p>
+    </section>
+
+    <section id="over-panel" class="panel" hidden aria-labelledby="over-title">
+      <div id="over-eyebrow" class="eyebrow">STAGE CLEAR</div>
+      <h2 id="over-title">这一关守住了</h2>
+      <div id="over-pips" class="pips" hidden></div>
+      <div class="stats-wrap"><table id="over-stats" class="stats"></table></div>
+      <div class="btn-row"><button id="next" class="primary" type="button">下一关</button><button id="to-title" class="chip" type="button">回到开始</button></div>
+      <p id="over-note" class="note"></p>
+    </section>
+  </div>
+
+  <aside id="keys-panel" class="keys-panel" hidden aria-label="键位说明">
+    <h3>键位</h3>
+    <table>
+      <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</td><td>开车（同时按两个方向，以后按的为准）</td></tr>
+      <tr><td><kbd>J</kbd> 或 <kbd>空格</kbd></td><td>开火，按住连发</td></tr>
+      <tr><td><kbd>P</kbd></td><td>显示 / 隐藏键位</td></tr>
+    </table>
+    <p class="keys-tips">星级：1 星子弹变快，2 星同屏 2 发，3 星打穿铁饼干盒。被队友打中只定身 2 秒。Esc 会直接关掉游戏窗口，想离开请点右上角「离开」。</p>
+  </aside>
+  <div class="drop-hint" aria-hidden="true">松手导入形象</div>
+  <script>__SCRIPT__</script>
+</body>
+</html>

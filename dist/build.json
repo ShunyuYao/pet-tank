@@ -1,0 +1,14 @@
+{
+  "file": "dist/桌宠坦克营.html",
+  "bytes": 741849,
+  "sha256": "57dc15b2f72c3ab18f4526cb51a615e170c9848c7a18ab84c422e4e72a67da34",
+  "version": "0.1.0",
+  "protocol": {
+    "id": "pet-tank",
+    "version": 1
+  },
+  "petKit": "0.1.0",
+  "esbuild": "0.28.1",
+  "three": "0.164.1",
+  "cannon": "0.20.0"
+}
