@@ -11,6 +11,9 @@ const {W,H,BW,BH,T,ITEM}=Config;
 const wx=x=>x-W/2,wz=y=>y-H/2;
 // The pet stands inside the turret: feet below the floor line, the hatch at its waist.
 const PET_HEIGHT=1.35,HATCH_Y=0.46,SEAT_Y=HATCH_Y-PET_HEIGHT*0.42;
+// A 2D standee leans back (avatars.js tilts it 0.32 rad so it reads from above): move it towards
+// the camera so the line where the hatch cuts it sits at the turret's centre, not its back edge.
+const STANDEE_FORWARD=Math.tan(0.32)*(HATCH_Y-SEAT_Y);
 // Game direction (0 up, 1 right, 2 down, 3 left) → rotation.y for a +Z-facing model; → avatar yaw.
 const ROT=[Math.PI,Math.PI/2,0,-Math.PI/2],YAW=[-Math.PI/2,0,Math.PI/2,Math.PI];
 
@@ -103,10 +106,12 @@ export function createWorld(canvas){
     body.scale.setScalar(look.scale||1);
     const shield=new THREE.Mesh(new THREE.SphereGeometry(0.68,24,16),new THREE.MeshStandardMaterial({color:'#fff8d6',transparent:true,opacity:.22,emissive:'#fff1a8',emissiveIntensity:.35,depthWrite:false}));shield.position.y=0.35;shield.visible=false;g.add(shield);
     const ice=new THREE.Mesh(new THREE.BoxGeometry(1,0.7,1),new THREE.MeshStandardMaterial({color:'#bfe8ff',transparent:true,opacity:.35,roughness:.05,depthWrite:false}));ice.position.y=0.35;ice.visible=false;g.add(ice);
-    const mats=[];g.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(!mats.includes(m)){m.transparent=true;mats.push(m);}});
+    // Tanks are drawn back to front without writing depth, so the pet riding in the hatch (drawn
+    // after its tank) shows over the turret instead of sinking behind it. Walls still hide both.
+    const mats=[];g.traverse(o=>{if(!o.isMesh)return;o.renderOrder=o===shield||o===ice?3:1;for(const m of [].concat(o.material))if(!mats.includes(m)){m.transparent=true;m.depthWrite=false;mats.push(m);}});
     scene.add(g);return {group:g,paint,shield,ice,mats,turret};
   }
-  const setAlpha=(mats,a,base=new Map())=>{for(const m of mats){if(!base.has(m))base.set(m,m.opacity);m.opacity=base.get(m)*a;m.depthWrite=a>0.9;}};
+  const setAlpha=(mats,a,base=new Map())=>{for(const m of mats){if(!base.has(m))base.set(m,m.opacity);m.opacity=base.get(m)*a;}};
 
   const players=new Map(),building=new Map();
   function nameTag(text,color){
@@ -126,7 +131,7 @@ export function createWorld(canvas){
     const old=players.get(slot);if(old){scene.remove(old.tank.group,old.seat);old.avatar.dispose?.();}
     const c=new THREE.Color(color),tank=tankModel(c,'player');
     const seat=new THREE.Group();seat.add(avatar.object);
-    avatar.object.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;for(const m of [].concat(o.material)){m.clippingPlanes=[hatchClip];m.clipShadows=true;}});
+    avatar.object.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.renderOrder=2;for(const m of [].concat(o.material)){m.clippingPlanes=[hatchClip];m.clipShadows=true;}});
     // The name lies on the floor in front of the tank, so it never covers the pet.
     const tag=nameTag(name,c);tag.position.set(0,0.05-SEAT_Y,0.78);seat.add(tag);
     scene.add(seat);
@@ -142,7 +147,7 @@ export function createWorld(canvas){
       const target=!a.alive||view==='hidden'?0:view==='ghost'?0.42:1;p.fade+=(target-p.fade)*Math.min(1,dt*10);
       const shown=p.fade>0.03;p.tank.group.visible=shown;p.seat.visible=shown;
       p.tank.group.position.set(wx(a.x),0,wz(a.y));p.tank.group.rotation.y=ROT[a.dir];
-      p.seat.position.set(wx(a.x),SEAT_Y,wz(a.y));
+      p.seat.position.set(wx(a.x),SEAT_Y,wz(a.y)+(p.kind==='sprite'?STANDEE_FORWARD:0));
       setAlpha(p.tank.mats,p.fade,p.baseAlpha);
       p.tank.shield.visible=a.alive&&w.t<a.shieldUntil;p.tank.shield.material.opacity=0.18+Math.sin(clock*8)*0.06;
       p.tank.ice.visible=a.alive&&w.t<a.frozenUntil;

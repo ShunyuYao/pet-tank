@@ -1,8 +1,8 @@
 {
   "file": "dist/桌宠坦克营.html",
-  "bytes": 741849,
-  "sha256": "57dc15b2f72c3ab18f4526cb51a615e170c9848c7a18ab84c422e4e72a67da34",
-  "version": "0.1.0",
+  "bytes": 741957,
+  "sha256": "11bbc7d40136b9b9054277346c2d19d06e239c343215da1c815f0a864b8503e1",
+  "version": "0.1.1",
   "protocol": {
     "id": "pet-tank",
     "version": 1

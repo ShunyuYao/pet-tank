@@ -350,7 +350,7 @@ window.__tank={
     lobby:session?.lan?session.lan.lobby().players.map(p=>({slot:p.slot,name:p.name,kind:p.kind,ready:p.ready,you:p.you})):null,
     audio:audio.state(),net:session?.lan?.stats?.()||null};},
   world:()=>world.info(),
-  screen:(x,y)=>world.project(x,y),
+  screen:(x,y,h)=>world.project(x,y,h),
 };
 
 // ---------- boot ----------

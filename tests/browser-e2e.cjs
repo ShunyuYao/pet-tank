@@ -7,7 +7,15 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
 const {launch,ROOT}=require('./launch.cjs');
 const DOLL=process.env.TANK_DOLL_ZIP||path.resolve(ROOT,'../rat-doll-lab/dist/rat-doll-female.zip');
 const IMAGE=process.env.TANK_IMAGE||path.resolve(ROOT,'../rat-doll-lab/dist/rat-doll-male/frames/idle/frame_00.png');
+const STANDEE=path.join(__dirname,'fixtures/pink-standee.png'); // a plain pink picture: easy to tell from any tank
 const out=path.join(ROOT,'artifacts/browser-e2e');fs.mkdirSync(out,{recursive:true});
+// One screen pixel through the browser's own screenshot (a 1×1 PNG: the first row's filter
+// byte then the raw colour, whatever the filter type).
+async function pixelAt(p,x,y){
+  const {data}=await p.send('Page.captureScreenshot',{format:'png',clip:{x:Math.round(x),y:Math.round(y),width:1,height:1,scale:1}});
+  const png=Buffer.from(data,'base64');let i=8,idat=[];while(i<png.length){const n=png.readUInt32BE(i),t=png.toString('ascii',i+4,i+8);if(t==='IDAT')idat.push(png.subarray(i+8,i+8+n));i+=12+n;}
+  const raw=require('node:zlib').inflateSync(Buffer.concat(idat));return [raw[1],raw[2],raw[3]];
+}
 const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.stringify(detail):''));console.log('PASS',label);};
 (async()=>{
   assert(fs.existsSync(DOLL)&&fs.existsSync(IMAGE),'local character fixtures missing');
@@ -67,6 +75,17 @@ const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.
     const v=await st();check(v.gameMode==='versus'&&v.players.length===4&&v.players.filter(x=>x.kind==='bot').length===3,'versus fills three computer tanks',v.players);
     check(await p.evaluate('!document.querySelector("#timer").hidden&&/^[23]:\\d\\d$/.test(document.querySelector("#timer").textContent)'),'versus shows the clock');
     await sleep(3000);await shot('04-versus');
+    await p.activate('#leave');await wait('window.__tank.state().mode==="title"','back to title');
+    // A 2D pet rides in the hatch: with the tank facing the camera, the screen points above the
+    // turret centre at the pet's waist show the pet, not the turret (it used to sink behind it).
+    await p.setFiles('#import-file',[STANDEE]);await wait('window.__tank.state().driver.kind==="sprite"','standee import');
+    await wait('window.__tank.world().players.find(q=>q.slot===0)?.kind==="sprite"','standee built');
+    await p.activate('.mode-card[data-mode="coop"]');await p.activate('#solo');await wait('window.__tank.state().phase==="play"','play',8000);
+    await p.key('KeyW');await sleep(1000);await p.key('KeyW','keyUp');await p.key('KeyS');await sleep(120);await p.key('KeyS','keyUp');
+    await wait('window.__tank.state().me.dir===2&&!window.__tank.state().me.shield','facing the camera, shield gone',4000);await sleep(300);
+    const m=await me(),px=[];for(const h of [0.6,0.75,0.9]){const q=await p.evaluate(`window.__tank.screen(${m.x},${m.y},${h})`);px.push(await pixelAt(p,q.x,q.y));}
+    await shot('05-standee-in-hatch');
+    check(px.every(([r,g,b])=>r>150&&b>120&&g<150),'a 2D pet facing the camera shows above its own turret, not behind it',px);
     await p.activate('#leave');await wait('window.__tank.state().mode==="title"','back to title');
     assert.deepEqual(errors,[],'no page errors');check(true,'no page errors or exceptions');
   }finally{close();}
