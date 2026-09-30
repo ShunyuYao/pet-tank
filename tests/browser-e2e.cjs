@@ -22,16 +22,18 @@ const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.
   const {p,wait,errors,close,sleep}=await launch();
   const st=()=>p.evaluate('window.__tank.state()'),me=async()=>(await st()).me,shot=n=>p.screenshot(path.join(out,n+'.png'));
   const mine=async()=>(await st()).bullets.filter(b=>b.by.p===0).length;
-  const seat=async kind=>{const x=(await p.evaluate('window.__tank.world()')).players.find(q=>q.slot===0);return x?.kind===kind&&x.seated&&x.clipped;};
+  const rider=async()=>(await p.evaluate('window.__tank.world()')).players.find(q=>q.slot===0);
   try{
     await wait('window.__tank?.state().driver','boot');
     check(await p.evaluate('typeof window.pet==="undefined"'),'plain browser: no pet SDK');
     check((await st()).driver.kind==='toy','default look is a built-in toy');
-    // 2D and 3D pets ride in the turret, cut off at the hatch.
+    // 2D and 3D pets ride on top of the turret, whole: nothing is cut away.
     await p.setFiles('#import-file',[IMAGE]);await wait('window.__tank.state().driver.kind==="sprite"','2D import');
-    await wait(`(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x?.kind==="sprite"&&x.seated&&x.clipped;})()`,'2D standee in the hatch');check(true,'a picture rides in the turret as a 2D standee');
+    await wait(`(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x?.kind==="sprite"&&x.seated;})()`,'2D standee built');
+    {const x=await rider();check(x.whole&&Math.abs(x.bottom-x.seatTop)<0.03,'a picture stands whole on the turret as a 2D standee',x);}
     await p.setFiles('#import-file',[DOLL]);await wait('window.__tank.state().driver.kind==="doll3d"','3D import',60000);
-    await wait(`(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x?.kind==="doll3d"&&x.seated&&x.clipped;})()`,'3D doll in the hatch',30000);check(await seat('doll3d'),'a doll pack rides in the turret as a 3D doll');
+    await wait(`(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x?.kind==="doll3d"&&x.seated;})()`,'3D doll built',30000);
+    {const x=await rider();check(x.whole&&Math.abs(x.thighPitch)<0.2,'a 3D doll sits on the turret (thighs level, nothing cut away)',x);}
     await shot('01-title');
     // Options by keyboard: co-op, stage 1, easy computer.
     await p.activate('.mode-card[data-mode="coop"]');await p.activate('#stage-list [data-value="1"]');await p.activate('#cpu-list [data-value="0"]');
@@ -43,7 +45,7 @@ const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.
     await wait('window.__tank.state().phase==="play"','play',6000);
     // Drive up out of the spawn, then hold W and also press D: the most recent key wins.
     await p.key('KeyW');await sleep(500);const a=await me();check(a.y<y0-1,'W drives up',{y0,y:a.y});
-    await wait('window.__tank.world().players[0].yaw<-1.5','the pet faces up',2000);check(true,'the pet in the turret faces the way the tank drives');
+    await wait('window.__tank.world().players[0].yaw<-1.5','the pet faces up',2000);check(true,'the pet on the turret faces the way the tank drives');
     await p.key('KeyD');await sleep(400);await p.key('KeyD','keyUp');await p.key('KeyW','keyUp');
     const b=await me();check(b.x>a.x+0.6&&b.dir===1,'the most recent direction wins',{from:a,to:b});
     check((await p.evaluate('window.__tank.world().players[0].yaw'))===0,'the pet turned right with the tank');
@@ -76,16 +78,16 @@ const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.
     check(await p.evaluate('!document.querySelector("#timer").hidden&&/^[23]:\\d\\d$/.test(document.querySelector("#timer").textContent)'),'versus shows the clock');
     await sleep(3000);await shot('04-versus');
     await p.activate('#leave');await wait('window.__tank.state().mode==="title"','back to title');
-    // A 2D pet rides in the hatch: with the tank facing the camera, the screen points above the
-    // turret centre at the pet's waist show the pet, not the turret (it used to sink behind it).
+    // A 2D pet stands whole on the turret: with the tank facing the camera, the screen points
+    // above the turret centre show the pet, not the turret, from just above the seat up.
     await p.setFiles('#import-file',[STANDEE]);await wait('window.__tank.state().driver.kind==="sprite"','standee import');
     await wait('window.__tank.world().players.find(q=>q.slot===0)?.kind==="sprite"','standee built');
     await p.activate('.mode-card[data-mode="coop"]');await p.activate('#solo');await wait('window.__tank.state().phase==="play"','play',8000);
     await p.key('KeyW');await sleep(1000);await p.key('KeyW','keyUp');await p.key('KeyS');await sleep(120);await p.key('KeyS','keyUp');
     await wait('window.__tank.state().me.dir===2&&!window.__tank.state().me.shield','facing the camera, shield gone',4000);await sleep(300);
-    const m=await me(),px=[];for(const h of [0.6,0.75,0.9]){const q=await p.evaluate(`window.__tank.screen(${m.x},${m.y},${h})`);px.push(await pixelAt(p,q.x,q.y));}
-    await shot('05-standee-in-hatch');
-    check(px.every(([r,g,b])=>r>150&&b>120&&g<150),'a 2D pet facing the camera shows above its own turret, not behind it',px);
+    const m=await me(),px=[];for(const h of [0.6,0.9,1.2]){const q=await p.evaluate(`window.__tank.screen(${m.x},${m.y},${h})`);px.push(await pixelAt(p,q.x,q.y));}
+    await shot('05-standee-on-turret');
+    {const x=await rider();check(px.every(([r,g,b])=>r>150&&b>120&&g<150)&&x.whole&&Math.abs(x.bottom-x.seatTop)<0.03,'a 2D pet stands whole on the turret, in front of it',{px,x});}
     await p.activate('#leave');await wait('window.__tank.state().mode==="title"','back to title');
     assert.deepEqual(errors,[],'no page errors');check(true,'no page errors or exceptions');
   }finally{close();}

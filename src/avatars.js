@@ -1,5 +1,6 @@
 // Player bodies (SPEC §12). Three kinds share one interface:
-//   const a = await buildAvatar(asset, fallback, {height});
+//   const a = await buildAvatar(asset, fallback, {height, seated});
+//   a.seatHeight — how high the seat is above a.object's origin (a seated doll); 0 = it stands on it;
 //   a.object — THREE.Group, feet at the origin, faces +Z at yaw 0;
 //   a.update(dt, P) — P = {yaw, run, runPhase, cheer, visible, alpha, flash}.
 // - doll3d: the pet-ragdoll-renderer rig (photo head + skinned garments), posed kinematically;
@@ -54,7 +55,30 @@ function walkPose(doll,P){
   }
 }
 
-async function dollAvatar(asset,{height}){
+// Riding a tank (P given by the scene): sitting upright on the turret, thighs forward, shins
+// hanging over the front, hands on the knees; cheering lifts the arms.
+const SIT_PELVIS=1.0,SIT_SEAT=0.72; // rig units: pelvis height, and the seat surface under the thighs
+function sitPose(doll,P){
+  const B=doll.parts,place=(name,p,r)=>{B[name].position.copy(p);B[name].quaternion.copy(r);};
+  const q=axisQ(X,0.04),pelvis=V(0,0,SIT_PELVIS);
+  place('pelvis',pelvis,q);
+  const upper=add(pelvis,q.vmult(V(0,0,.49)));place('upperBody',upper,q);
+  const shoulder=add(upper,q.vmult(V(0,0,.35))),head=add(shoulder,q.vmult(V(0,0,.35)));
+  place('head',head,q.mult(axisQ(X,-0.1)));
+  const cheer=P.cheer||0;
+  for(const [side,sign] of [['Left',1],['Right',-1]]){
+    const hip=add(pelvis,V(sign*.18,0,-.14)),lq=axisQ(X,-1.5),kq=axisQ(X,-1.5+1.35);
+    place('upper'+side+'Leg',add(hip,lq.vmult(V(0,0,-.42))),lq);
+    const knee=add(hip,lq.vmult(V(0,0,-.84)));place('lower'+side+'Leg',add(knee,kq.vmult(V(0,0,-.39))),kq);
+    const joint=add(shoulder,q.vmult(V(sign*.36,-.02,0)));
+    const dir=norm(add(scale(V(sign*0.12,-0.55,-0.8),1-cheer),scale(V(sign*0.45,-0.1,1),cheer)));
+    place('upper'+side+'Arm',add(joint,scale(dir,.31)),between(V(sign,0,0),dir));
+    const elbow=add(joint,scale(dir,.62)),lowerDir=norm(add(dir,V(0,-0.45*(1-cheer),0.2*(1-cheer))));
+    place('lower'+side+'Arm',add(elbow,scale(lowerDir,.29)),between(V(sign,0,0),lowerDir));
+  }
+}
+
+async function dollAvatar(asset,{height,seated=false}){
   const holder=new THREE.Group(),body=new THREE.Group(),rig=new THREE.Group();
   const texture=await loadTexture(asset.head);
   const garments={};
@@ -70,13 +94,16 @@ async function dollAvatar(asset,{height}){
     const c=new THREE.Vector3(0,chin,0),anchor=c.clone().applyQuaternion(photo.quaternion).add(photo.position);
     photo.scale.setScalar(asset.headScale);photo.position.copy(anchor).sub(c.clone().multiplyScalar(asset.headScale).applyQuaternion(photo.quaternion));
   }
-  rig.rotation.x=-Math.PI/2;rig.scale.setScalar(height*1.3/2.75);
+  const k=height*1.3/2.75;
+  rig.rotation.x=-Math.PI/2;rig.scale.setScalar(k);
   body.add(rig);holder.add(body);transparentAll(holder);
   const mats=materialsOf(holder);
-  return {kind:'doll3d',object:holder,height,
+  return {kind:'doll3d',object:holder,height,seatHeight:seated?SIT_SEAT*k:0,
+    // How far the thighs point below horizontal, in radians (0 = level, as when seated).
+    thighPitch(){const d=doll.parts.upperLeftLeg.quaternion.vmult(V(0,0,-1));return Math.asin(Math.max(-1,Math.min(1,-d.z)));},
     update(dt,P){
       holder.rotation.y=yawToRotation(P.yaw);
-      walkPose(doll,P);
+      if(seated)sitPose(doll,P);else walkPose(doll,P);
       for(const b of doll.bodies){b.visual.position.copy(b.position);b.visual.quaternion.copy(b.quaternion);}
       doll.garments.update();
       for(const m of mats){m.opacity=P.alpha??1;if(m.emissive)m.emissive.setScalar((P.flash||0)*0.6);}

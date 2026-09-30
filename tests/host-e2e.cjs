@@ -230,10 +230,10 @@ async function tankPlay(a,b,c){
   await wait(async()=>{for(const app of all)if(!['count','play'].includes((await state(app)).phase))return false;return true;},'all counting down',8000);
   const first=await state(a);assert.equal(first.players.length,3,'co-op: the three who came');assert.equal(first.gameMode,'coop');
   check('the stage starts only when all three are ready; co-op seats only the people who came');
-  // Every screen draws every human riding in the turret as that human's own kind (2D / 3D).
+  // Every screen draws every human riding whole on top of its turret as that human's own kind (2D / 3D).
   const kinds={},slots={};for(const app of all){const x=await state(app);kinds[app.label]=x.driver.kind;slots[app.label]=x.mySlot;}
-  for(const app of all)await wait(async()=>{const p=(await world(app)).players;return all.every(o=>{const q=p.find(x=>x.slot===slots[o.label]);return q?.kind===kinds[o.label]&&q.seated&&q.clipped;});},'every human riding as its own kind on '+app.label,90000);
-  check('each pet rides in its turret as its own 2D / 3D kind on every screen',{kinds,slots});
+  for(const app of all)await wait(async()=>{const p=(await world(app)).players;return all.every(o=>{const q=p.find(x=>x.slot===slots[o.label]);return q?.kind===kinds[o.label]&&q.seated&&q.whole;});},'every human riding as its own kind on '+app.label,90000);
+  check('each pet rides on its turret as its own 2D / 3D kind on every screen',{kinds,slots});
   await wait(async()=>(await state(a)).phase==='play','play',8000);
   // Drive and fire with real keys; meanwhile every screen must see the others' bullets.
   // (Every shot a screen flies is counted by shooter in the state hook: short shots into a wall

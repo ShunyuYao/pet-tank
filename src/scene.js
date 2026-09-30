@@ -1,6 +1,6 @@
 // The 3D view (SPEC §12): a toy-room floor seen from a fixed angle, toy bricks, cookie tins,
-// spilled water, rugs, waxed tiles, the snack jar, toy tanks with the pets riding in the turret
-// hatch, enemies, bullets, items and bursts. Reads the simulation, never writes it.
+// spilled water, rugs, waxed tiles, the snack jar, toy tanks with the pets riding on top (a doll
+// sits on the turret, legs over the front), enemies, bullets, items and bursts. Reads the simulation, never writes it.
 // Grid point (x, y) in cells sits at world (x − W/2, 0, y − H/2).
 import * as THREE from '../vendor/lib/three.module.js';
 import Config from '../game/config.cjs';
@@ -9,11 +9,9 @@ import {buildAvatar} from './avatars.js';
 
 const {W,H,BW,BH,T,ITEM}=Config;
 const wx=x=>x-W/2,wz=y=>y-H/2;
-// The pet stands inside the turret: feet below the floor line, the hatch at its waist.
-const PET_HEIGHT=1.35,HATCH_Y=0.46,SEAT_Y=HATCH_Y-PET_HEIGHT*0.42;
-// A 2D standee leans back (avatars.js tilts it 0.32 rad so it reads from above): move it towards
-// the camera so the line where the hatch cuts it sits at the turret's centre, not its back edge.
-const STANDEE_FORWARD=Math.tan(0.32)*(HATCH_Y-SEAT_Y);
+// The pet rides on top of its tank: a 3D doll sits on the cushion on the turret, legs over the
+// front; a 2D standee or a toy stands on it, whole.
+const SEAT_TOP=0.53,PET_SIZE={doll3d:1.3,sprite:1.3,toy:1.0};
 // Game direction (0 up, 1 right, 2 down, 3 left) → rotation.y for a +Z-facing model; → avatar yaw.
 const ROT=[Math.PI,Math.PI/2,0,-Math.PI/2],YAW=[-Math.PI/2,0,Math.PI/2,Math.PI];
 
@@ -31,8 +29,6 @@ export function createWorld(canvas){
   scene.add(new THREE.HemisphereLight('#fff6ea','#7a6250',1.45));
   const sun=new THREE.DirectionalLight('#ffffff',1.6);sun.position.set(-7,16,9);sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-12,right:12,top:9,bottom:-9,near:1,far:40});scene.add(sun);
-  // Only the part of a pet above the hatch shows (SPEC §12).
-  const hatchClip=new THREE.Plane(new THREE.Vector3(0,1,0),-HATCH_Y+0.02);
 
   // Floor: wooden planks; a darker rug around the field.
   const floorTex=canvasTexture(W*64,H*64,g=>{
@@ -101,17 +97,15 @@ export function createWorld(canvas){
     const turret=add(new THREE.CylinderGeometry(0.24,0.27,0.16,20),paint,[0,0.4,-0.04]);
     const barrels=kind==='rapid'?[-0.07,0.07]:[0];
     for(const bx of barrels)add(new THREE.CylinderGeometry(0.045,0.05,0.46,10),metal,[bx,0.41,0.3]).rotation.x=Math.PI/2;
-    if(kind==='player'){const rim=add(new THREE.TorusGeometry(0.16,0.03,8,20),metal,[0,0.48,-0.04]);rim.rotation.x=Math.PI/2;}
+    if(kind==='player')add(new THREE.CylinderGeometry(0.2,0.21,0.05,20),std({color:'#fff4dc',roughness:.9}),[0,SEAT_TOP-0.025,-0.04]); // the seat cushion
     else add(new THREE.SphereGeometry(0.1,12,8),metal,[0,0.5,-0.04]);
     body.scale.setScalar(look.scale||1);
     const shield=new THREE.Mesh(new THREE.SphereGeometry(0.68,24,16),new THREE.MeshStandardMaterial({color:'#fff8d6',transparent:true,opacity:.22,emissive:'#fff1a8',emissiveIntensity:.35,depthWrite:false}));shield.position.y=0.35;shield.visible=false;g.add(shield);
     const ice=new THREE.Mesh(new THREE.BoxGeometry(1,0.7,1),new THREE.MeshStandardMaterial({color:'#bfe8ff',transparent:true,opacity:.35,roughness:.05,depthWrite:false}));ice.position.y=0.35;ice.visible=false;g.add(ice);
-    // Tanks are drawn back to front without writing depth, so the pet riding in the hatch (drawn
-    // after its tank) shows over the turret instead of sinking behind it. Walls still hide both.
-    const mats=[];g.traverse(o=>{if(!o.isMesh)return;o.renderOrder=o===shield||o===ice?3:1;for(const m of [].concat(o.material))if(!mats.includes(m)){m.transparent=true;m.depthWrite=false;mats.push(m);}});
+    const mats=[];g.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(!mats.includes(m)){m.transparent=true;mats.push(m);}});
     scene.add(g);return {group:g,paint,shield,ice,mats,turret};
   }
-  const setAlpha=(mats,a,base=new Map())=>{for(const m of mats){if(!base.has(m))base.set(m,m.opacity);m.opacity=base.get(m)*a;}};
+  const setAlpha=(mats,a,base=new Map())=>{for(const m of mats){if(!base.has(m))base.set(m,m.opacity);m.opacity=base.get(m)*a;m.depthWrite=a>0.9;}};
 
   const players=new Map(),building=new Map();
   function nameTag(text,color){
@@ -126,14 +120,14 @@ export function createWorld(canvas){
     const cur=players.get(slot);
     if(cur&&cur.signature===signature&&cur.name===name&&cur.color===color)return;
     const token={};building.set(slot,token);
-    const avatar=await buildAvatar(asset,fallback,{height:asset?.kind==='sprite'?PET_HEIGHT*1.2:PET_HEIGHT});
+    const avatar=await buildAvatar(asset,fallback,{height:PET_SIZE[asset?.kind]||PET_SIZE.toy,seated:true});
     if(building.get(slot)!==token){avatar.dispose?.();return;}
     const old=players.get(slot);if(old){scene.remove(old.tank.group,old.seat);old.avatar.dispose?.();}
     const c=new THREE.Color(color),tank=tankModel(c,'player');
     const seat=new THREE.Group();seat.add(avatar.object);
-    avatar.object.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.renderOrder=2;for(const m of [].concat(o.material)){m.clippingPlanes=[hatchClip];m.clipShadows=true;}});
+    avatar.object.traverse(o=>{if(o.isMesh)o.castShadow=true;});
     // The name lies on the floor in front of the tank, so it never covers the pet.
-    const tag=nameTag(name,c);tag.position.set(0,0.05-SEAT_Y,0.78);seat.add(tag);
+    const tag=nameTag(name,c);tag.position.set(0,0.05-SEAT_TOP+(avatar.seatHeight||0),0.78);seat.add(tag);
     scene.add(seat);
     const baseAlpha=new Map();
     players.set(slot,{avatar,tank,seat,tag,signature,name,color,kind:avatar.kind,fade:1,baseAlpha,view:'full',yaw:0});
@@ -147,7 +141,7 @@ export function createWorld(canvas){
       const target=!a.alive||view==='hidden'?0:view==='ghost'?0.42:1;p.fade+=(target-p.fade)*Math.min(1,dt*10);
       const shown=p.fade>0.03;p.tank.group.visible=shown;p.seat.visible=shown;
       p.tank.group.position.set(wx(a.x),0,wz(a.y));p.tank.group.rotation.y=ROT[a.dir];
-      p.seat.position.set(wx(a.x),SEAT_Y,wz(a.y)+(p.kind==='sprite'?STANDEE_FORWARD:0));
+      p.seat.position.set(wx(a.x),SEAT_TOP-(p.avatar.seatHeight||0),wz(a.y));
       setAlpha(p.tank.mats,p.fade,p.baseAlpha);
       p.tank.shield.visible=a.alive&&w.t<a.shieldUntil;p.tank.shield.material.opacity=0.18+Math.sin(clock*8)*0.06;
       p.tank.ice.visible=a.alive&&w.t<a.frozenUntil;
@@ -225,7 +219,7 @@ export function createWorld(canvas){
   function fits(dist,lookZ,box){
     camera.position.set(0,dist*Math.sin(PITCH),lookZ+dist*Math.cos(PITCH));camera.lookAt(0,0,lookZ);camera.updateMatrixWorld();
     let minX=1,maxX=-1,minY=1,maxY=-1;
-    for(const [x,z,y] of [[-W/2,-H/2,SEAT_Y+PET_HEIGHT],[W/2,-H/2,SEAT_Y+PET_HEIGHT],[-W/2,H/2,0],[W/2,H/2,0],[-W/2,H/2,0.5],[W/2,H/2,0.5]]){
+    for(const [x,z,y] of [[-W/2,-H/2,SEAT_TOP+1.2],[W/2,-H/2,SEAT_TOP+1.2],[-W/2,H/2,0],[W/2,H/2,0],[-W/2,H/2,0.5],[W/2,H/2,0.5]]){
       _v.set(x,y,z).project(camera);minX=Math.min(minX,_v.x);maxX=Math.max(maxX,_v.x);minY=Math.min(minY,_v.y);maxY=Math.max(maxY,_v.y);}
     return {ok:minX>=box.l&&maxX<=box.r&&minY>=box.b&&maxY<=box.t,minY,maxY};
   }
@@ -255,7 +249,9 @@ export function createWorld(canvas){
   // Cell point → client px (for tests driven by real input).
   const tmp=new THREE.Vector3();
   function project(x,y,h=0.4){tmp.set(wx(x),h,wz(y)).project(camera);const r=canvas.getBoundingClientRect();return {x:r.left+(tmp.x+1)/2*r.width,y:r.top+(1-tmp.y)/2*r.height};}
-  function info(){return {players:[...players.entries()].map(([slot,p])=>({slot,kind:p.kind,visible:p.tank.group.visible,view:p.view,alpha:+p.fade.toFixed(2),yaw:+p.yaw.toFixed(3),seated:p.avatar.object.parent===p.seat,clipped:(()=>{let ok=true;p.avatar.object.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(!m.clippingPlanes?.includes(hatchClip))ok=false;});return ok;})()})),
+  function info(){return {players:[...players.entries()].map(([slot,p])=>({slot,kind:p.kind,visible:p.tank.group.visible,view:p.view,alpha:+p.fade.toFixed(2),yaw:+p.yaw.toFixed(3),seated:p.avatar.object.parent===p.seat,
+      whole:(()=>{let ok=true;p.avatar.object.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(m.clippingPlanes?.length)ok=false;});return ok;})(),
+      bottom:+new THREE.Box3().setFromObject(p.avatar.object).min.y.toFixed(3),seatTop:SEAT_TOP,thighPitch:p.avatar.thighPitch?+p.avatar.thighPitch().toFixed(3):null})),
     enemies:enemyMeshes.size,bullets:lastBullets,bricks:inst.brick.count,steel:inst.steel.count,jars:jars.map(j=>j.rotation.z!==0?'down':'up'),item:Object.values(itemMeshes).some(g=>g.visible),calls:renderer.info.render.calls};}
   return {render,setPlayer,removePlayer,project,info,renderer,camera};
 }
