@@ -105,7 +105,13 @@ export function createWorld(canvas){
     const mats=[];g.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(!mats.includes(m)){m.transparent=true;mats.push(m);}});
     scene.add(g);return {group:g,paint,shield,ice,mats,turret};
   }
-  const setAlpha=(mats,a,base=new Map())=>{for(const m of mats){if(!base.has(m))base.set(m,m.opacity);m.opacity=base.get(m)*a;m.depthWrite=a>0.9;}};
+  // Fading must preserve each material's depth policy. In particular, the spawn
+  // shield and ice are translucent effects: writing their depth cuts holes in
+  // the rider's clothes even though the effect itself is nearly transparent.
+  const setAlpha=(mats,a,base=new Map())=>{for(const m of mats){
+    if(!base.has(m))base.set(m,{opacity:m.opacity,depthWrite:m.depthWrite});
+    const initial=base.get(m);m.opacity=initial.opacity*a;m.depthWrite=initial.depthWrite&&a>0.9;
+  }};
 
   const players=new Map(),building=new Map();
   function nameTag(text,color){
@@ -250,6 +256,7 @@ export function createWorld(canvas){
   const tmp=new THREE.Vector3();
   function project(x,y,h=0.4){tmp.set(wx(x),h,wz(y)).project(camera);const r=canvas.getBoundingClientRect();return {x:r.left+(tmp.x+1)/2*r.width,y:r.top+(1-tmp.y)/2*r.height};}
   function info(){return {players:[...players.entries()].map(([slot,p])=>({slot,kind:p.kind,visible:p.tank.group.visible,view:p.view,alpha:+p.fade.toFixed(2),yaw:+p.yaw.toFixed(3),seated:p.avatar.object.parent===p.seat,
+      effects:{shield:{visible:p.tank.shield.visible,depthWrite:p.tank.shield.material.depthWrite},ice:{visible:p.tank.ice.visible,depthWrite:p.tank.ice.material.depthWrite},bodyDepthWrite:p.tank.paint.depthWrite},
       whole:(()=>{let ok=true;p.avatar.object.traverse(o=>{if(o.isMesh)for(const m of [].concat(o.material))if(m.clippingPlanes?.length)ok=false;});return ok;})(),
       bottom:+new THREE.Box3().setFromObject(p.avatar.object).min.y.toFixed(3),seatTop:SEAT_TOP,thighPitch:p.avatar.thighPitch?+p.avatar.thighPitch().toFixed(3):null})),
     enemies:enemyMeshes.size,bullets:lastBullets,bricks:inst.brick.count,steel:inst.steel.count,jars:jars.map(j=>j.rotation.z!==0?'down':'up'),item:Object.values(itemMeshes).some(g=>g.visible),calls:renderer.info.render.calls};}

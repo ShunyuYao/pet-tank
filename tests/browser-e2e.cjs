@@ -30,9 +30,11 @@ const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.
     // 2D and 3D pets ride on top of the turret, whole: nothing is cut away.
     await p.setFiles('#import-file',[IMAGE]);await wait('window.__tank.state().driver.kind==="sprite"','2D import');
     await wait(`(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x?.kind==="sprite"&&x.seated;})()`,'2D standee built');
+    await wait('(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x&&Math.abs(x.bottom-x.seatTop)<0.03;})()','2D standee positioned on the next render frame');
     {const x=await rider();check(x.whole&&Math.abs(x.bottom-x.seatTop)<0.03,'a picture stands whole on the turret as a 2D standee',x);}
     await p.setFiles('#import-file',[DOLL]);await wait('window.__tank.state().driver.kind==="doll3d"','3D import',60000);
     await wait(`(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x?.kind==="doll3d"&&x.seated;})()`,'3D doll built',30000);
+    await wait('(()=>{const x=window.__tank.world().players.find(q=>q.slot===0);return x&&Math.abs(x.thighPitch)<0.2;})()','3D sitting pose applied on the next render frame');
     {const x=await rider();check(x.whole&&Math.abs(x.thighPitch)<0.2,'a 3D doll sits on the turret (thighs level, nothing cut away)',x);}
     await shot('01-title');
     // Options by keyboard: co-op, stage 1, easy computer.

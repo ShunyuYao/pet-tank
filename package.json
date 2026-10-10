@@ -1,6 +1,6 @@
 {
   "name": "pet-tank",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "桌宠坦克营 — a single-file HTML toy-tank game for the desktop pet's HTML works (internet and LAN, 1–4 players, co-op and 2v2).",
   "license": "MIT",
@@ -11,11 +11,12 @@
     "test:net": "node --test tests/net.test.cjs",
     "test:browser": "node tests/browser-e2e.cjs",
     "test:host": "node tests/host-e2e.cjs",
-    "test": "npm run build && npm run test:artifact && npm run test:rules && npm run test:net && npm run test:browser",
+    "test": "npm run build && npm run test:artifact && npm run test:rules && npm run test:net && npm run test:browser && npm run test:appearance",
     "test:artifact": "node --test tests/artifact.test.cjs",
     "test:host:relay": "node tests/host-e2e.cjs --relay --four",
     "test:host:mixed": "node tests/host-e2e.cjs --mixed --four",
     "test:delivery": "npm test && npm run test:host && npm run test:host:relay && npm run test:host:mixed && npm run test:motion:host",
-    "test:motion:host": "node tests/motion-e2e.cjs"
+    "test:motion:host": "node tests/motion-e2e.cjs",
+    "test:appearance": "node tests/appearance-e2e.cjs"
   }
 }

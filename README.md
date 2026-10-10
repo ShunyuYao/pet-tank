@@ -47,6 +47,7 @@ Esc 在桌宠里会直接关掉游戏窗口，想离开请点右上角「离开�
 npm run build        # dist/桌宠坦克营.html
 npm run test:rules   # 规则单测
 npm run test:net     # 联机（pet-kit 的严格模拟宿主：丢包、限速、宿主限额）
+npm run test:appearance # 保护罩期间的男女 3D 上身可见性（真实像素）
 npm run test:browser # 普通浏览器端到端（真实按键）
 npm run test:host    # 三个隐藏桌宠实例，真实局域网入口
 npm run test:host:relay # 四个实例，真实中转/TLS/键盘输入
