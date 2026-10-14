@@ -1,14 +1,14 @@
 {
   "file": "dist/桌宠坦克营-LAN.html",
-  "bytes": 744813,
-  "sha256": "e60e97acd7db2c7a63d06fb29f2ad2509eff0a2e4f96b7767d1d8750829af7f5",
+  "bytes": 747751,
+  "sha256": "c3456f9589413bd8b85f45ad61935c41cfec0f3e3886dba6c84bc33bb79cad6e",
   "version": "0.2.0",
   "protocol": {
     "id": "pet-tank",
     "version": 2
   },
   "transport": "lan",
-  "petKit": "0.2.1",
+  "petKit": "0.3.0",
   "esbuild": "0.28.1",
   "three": "0.164.1",
   "cannon": "0.20.0"

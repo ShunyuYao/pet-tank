@@ -25,6 +25,7 @@ const packEnemy=e=>[e.id,r2(e.x),r2(e.y),e.dir,e.moving?1:0,e.hp];
 function create(sdk,{onLobby=()=>{},onAsset=()=>{},onConnection=()=>{},onClosed=()=>{},onError=()=>{},onFeed=()=>{},now=()=>Date.now(),strict=false,budgetBytes=12*1024,playMs=null}={}){
   let game=null,host=false,mySlot=null,lastHash=0,hashMiss=0,remote={ph:'lobby',no:0};
   const interp=new Map(),budget=[];
+  const presentation=require('./presentation.cjs').create();
   // Remote tanks are shown INTERP_MS behind, on the stage clock the sender stamped.
   function pushInterp(key,s,t){
     if(!Number.isFinite(t))return;const buf=interp.get(key)||[];const last=buf[buf.length-1];
@@ -53,7 +54,8 @@ function create(sdk,{onLobby=()=>{},onAsset=()=>{},onConnection=()=>{},onClosed=
     budget:{guestBytesPerSec:budgetBytes},onBudget:b=>{budget.push(b);if(budget.length>50)budget.shift();},
     hostState(){
       const w=game?.world,s={ph:game?.phase||'lobby',no:game?.stage||0,at:Math.round(room.hostNow())};
-      if(w){s.t=Math.round(w.t);s.p=w.players.map(p=>packPlayer(w,p));s.e=w.enemies.map(packEnemy);
+      if(w){s.t=Math.round(w.t);s.p=w.players.map(p=>packPlayer(w,p));
+        s.v=w.players.map(p=>{const raw=p.owner==='remote'?presentation.latest(p.slot):null;return [p.slot,raw?.time??Math.round(w.t),raw?.value.x??p.x,raw?.value.y??p.y,raw?.value.dir??p.dir,p.life];});s.e=w.enemies.map(packEnemy);
         if(now()-lastHash>=HASH_MS){lastHash=now();s.h=Sim.hash(w.terrain);}}
       return s;
     },
@@ -65,11 +67,12 @@ function create(sdk,{onLobby=()=>{},onAsset=()=>{},onConnection=()=>{},onClosed=
       if(host){
         const w=game?.world;if(!w||s.no!==game.stage)return;const p=Sim.player(w,slot);
         if(!p||!p.alive||s.l!==p.life)return;              // a report from before the last respawn
-        pushInterp('p'+slot,{x:s.x/100,y:s.y/100,d:s.d,m:s.m},s.t);return;
+        pushInterp('p'+slot,{x:s.x/100,y:s.y/100,d:s.d,m:s.m},s.t);presentation.push(slot,s.t,{x:s.x/100,y:s.y/100,dir:s.d},game.stage+':'+p.life);return;
       }
       remote={ph:s.ph,no:s.no};
       const w=game?.world;if(!w||s.no!==game.stage)return;
       if(Number.isFinite(s.t)){const target=s.t+(room.hostNow()-s.at);if(Math.abs(w.t-target)>80)w.t=target;else w.t+=(target-w.t)*0.1;}
+      for(const [slot,t,x,y,dir,life] of s.v||[])if(slot!==mySlot)presentation.push(slot,t,{x,y,dir},game.stage+':'+life);
       for(const [slot,x,y,d,m,l,st] of s.p||[])if(slot!==mySlot)pushInterp('p'+slot,{x:x/100,y:y/100,d,m,l,st},s.t);
         else{const me=Sim.player(w,slot);if(me){me.lives=l;me.stars=st;}}
       for(const [id,x,y,d,m,hp] of s.e||[])pushInterp('e'+id,{x:x/100,y:y/100,d,m,hp},s.t);
@@ -82,13 +85,13 @@ function create(sdk,{onLobby=()=>{},onAsset=()=>{},onConnection=()=>{},onClosed=
       }
       if(!game)return;
       if(e.type==='grid'){const w=game.world;if(w&&e.no===game.stage)for(let i=0;i<w.terrain.length;i++)w.terrain[i]=+e.terrain[i];return;}
-      if(e.type==='stage')interp.clear();
+      if(e.type==='stage'){interp.clear();presentation.clear();}
       if(e.type==='kill')interp.delete('e'+e.id);
-      if(e.type==='spawn')interp.delete('p'+e.slot);
+      if(e.type==='spawn'||e.type==='die'){interp.delete('p'+e.slot);presentation.remove(e.slot);}
       Game.receive(game,e);feed(e);
     },
     onLobby:l=>onLobby(l),onAsset,onConnection,onClosed,onError,
-    onPeerLeft(slot,{inMatch}){interp.delete('p'+slot);if(host&&game&&inMatch&&game.roster.some(r=>r.slot===slot))Game.takeOver(game,slot);},
+    onPeerLeft(slot,{inMatch}){interp.delete('p'+slot);presentation.remove(slot);if(host&&game&&inMatch&&game.roster.some(r=>r.slot===slot))Game.takeOver(game,slot);},
   });
 
   function humans(){return room.lobby().players.filter(p=>!p.waiting&&p.online!==false).map(p=>({slot:p.slot,name:p.name,signature:p.signature,look:p.kind,owner:p.slot===0?'local':'remote'}));}
@@ -102,8 +105,8 @@ function create(sdk,{onLobby=()=>{},onAsset=()=>{},onConnection=()=>{},onClosed=
   function flush(){
     const list=game.out.splice(0);
     for(const e of list){
-      if(e.type==='stage')interp.clear();
-      if(e.type==='spawn'||e.type==='die')interp.delete('p'+e.slot); // old reports belong to the previous tank
+      if(e.type==='stage'){interp.clear();presentation.clear();}
+      if(e.type==='spawn'||e.type==='die'){interp.delete('p'+e.slot);presentation.remove(e.slot);} // old reports belong to the previous tank
       try{room.emit(e);}catch(err){onError(Error(err.message+' in '+JSON.stringify(e).slice(0,200)));}
       feed(e);
     }
@@ -117,6 +120,7 @@ function create(sdk,{onLobby=()=>{},onAsset=()=>{},onConnection=()=>{},onClosed=
       return r;
     },
     get game(){return game;},
+    renderWorld:()=>presentation.world(game?.world,game?.phase==='play'),
     isHost:()=>host,
     mySlot:()=>host?0:room.mySlot(),
     step(dt,input){
