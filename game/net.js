@@ -1,5 +1,5 @@
 'use strict';
-// LAN room for the tank game (SPEC §11) on top of pet-kit: seats, lobby, events, state stream,
+// Internet / LAN room for the tank game (SPEC §11) on top of pet-kit: seats, lobby, events, state stream,
 // looks and budgets come from the kit; this file only decides what the state carries and who
 // is authoritative for what.
 //
@@ -13,7 +13,7 @@
 const {Room}=require('../vendor/pet-kit/index.js');
 const Game=require('./game.cjs'),Sim=require('./sim.cjs'),C=require('./config.cjs');
 
-const PROTOCOL={id:'pet-tank',version:1},PURPOSE='tank.look.v1';
+const PROTOCOL={id:'pet-tank',version:2},PURPOSE='tank.look.v1';
 const INTERP_MS=110,EXTRAP_MS=100,HASH_MS=2000;
 const SETTINGS={defaults:{mode:'coop',stage:1,arena:0,cpu:1},
   validate:v=>({mode:C.MODES.includes(v.mode)?v.mode:'coop',stage:Number.isInteger(v.stage)&&v.stage>=1&&v.stage<=C.STAGES?v.stage:1,arena:[0,1].includes(v.arena)?v.arena:0,cpu:[0,1,2].includes(v.cpu)?v.cpu:1})};

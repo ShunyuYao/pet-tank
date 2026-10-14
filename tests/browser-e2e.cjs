@@ -90,5 +90,5 @@ const check=(ok,label,detail)=>{assert.ok(ok,label+(detail!==undefined?' '+JSON.
     {const x=await rider();check(px.every(([r,g,b])=>r>150&&b>120&&g<150)&&x.whole&&Math.abs(x.bottom-x.seatTop)<0.03,'a 2D pet stands whole on the turret, in front of it',{px,x});}
     await p.activate('#leave');await wait('window.__tank.state().mode==="title"','back to title');
     assert.deepEqual(errors,[],'no page errors');check(true,'no page errors or exceptions');
-  }finally{close();}
+  }finally{await close();}
 })().catch(e=>{console.error(e);process.exit(1);});
