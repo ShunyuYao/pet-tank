@@ -23,3 +23,13 @@
 游戏 0.1.3 重新构建单文件 HTML；宿主 Test 游戏目录的 SHA256 同步至 `dist/build.json` 中的实际值。重新从游戏库打开才会使用新文件，已打开或历史收到的 HTML 保持其原内容。
 
 后续相同问题先覆盖“特效有效期间”的画面证据，而不是仅检查网格存在；不把扩大模型、双面绘制或取消角色深度测试作为修复。
+
+## 2026-10-15 联网主分支补齐
+
+产品打包核对发现上述修复仍留在旧分支，联网0.2.0未包含它。现恢复到0.2.1：只合并原材质深度修复与外观回归，保留当前联网协议、pet-kit 0.2.1和模拟，不引入已淘汰的Motion实验。双HTML由当前源码重新构建；auto SHA-256为`0c89e342330288f523696156bd6ff9c21db4bf85f21a4ac44241dc0e23379bc0`。
+
+同一外观测试重放旧联网产物时，护罩期间胸口像素断言失败；新产物男女两种角色、四朝向、护罩有效/过期和材质策略均通过。38项规则、4项网络、产物契约和完整浏览器玩法通过。首次完整运行因未显式指定私有形象路径而停在夹具检查，补齐路径后只重跑失败及未运行项，未改变产品或断言。
+
+真实三宿主隐藏Electron报告`artifacts/host-e2e/2026-10-15T02-52-26-661Z/report.json`通过：真实登录、文件投递与摘要、邀请、3D/2D形象互传、全部准备、三键盘移动开火、相同结算/地形、客人退出由电脑接管、房主退出关闭剩余对局；所有自有进程实际退出。宿主最初缺少账号测试依赖的失败记录保留，补齐后重放同一路径。无新增实体双机/公网验收。
+
+English: The older torso fix was missing from the internet main branch. Version 0.2.1 restores it without changing networking, simulation or adopting the rejected Motion experiment. The original shipped HTML fails the same real-pixel regression; the rebuilt artifact passes both 3D appearances, four directions, gameplay and a real three-host LAN lifecycle. Private fixture setup failures are retained separately. No new physical WAN or public installer release is claimed.
